@@ -172,6 +172,9 @@ class ClpVarnishCacheManager {
                     'headers'   => $headers,
                 ]
             );
+            if (true === is_wp_error($response)) {
+                throw new \Exception($response->get_error_message());
+            }
             $http_status_code = 0;
             if (true === isset($response['response']['code'])) {
                 $http_status_code = $response['response']['code'];
