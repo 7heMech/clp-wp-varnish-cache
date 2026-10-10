@@ -81,7 +81,7 @@ class ClpVarnishCacheAdmin {
 
     public function add_adminbar($adminbar) {
         $is_admin = is_admin();
-        if (true === current_user_can( 'edit_published_posts' )) {
+        if (true === current_user_can( 'manage_options' )) {
             $varnish_cache_settings = $this->clp_varnish_cache_manager->get_cache_settings();
             if (false === empty($varnish_cache_settings)) {
                 $menu_title = __( 'CLP Varnish Cache', 'clp-varnish-cache');
