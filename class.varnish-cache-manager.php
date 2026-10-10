@@ -3,6 +3,12 @@
 class ClpVarnishCacheManager {
 
     private $cache_settings = [];
+    private $exit_on_error = true;
+
+    public function set_exit_on_error($exit_on_error): void
+    {
+        $this->exit_on_error = (bool)$exit_on_error;
+    }
 
     public function is_enabled() {
         $settings = $this->get_cache_settings();
@@ -184,6 +190,10 @@ class ClpVarnishCacheManager {
             }
         } catch (\Exception $e) {
             $error_message = $e->getMessage();
+            if (false === $this->exit_on_error) {
+                error_log(sprintf('Varnish Cache Purge Failed, Error Message: %s', $error_message));
+                return;
+            }
             echo esc_html(sprintf('Varnish Cache Purge Failed, Error Message: %s', $error_message));
             exit();
         } finally {
