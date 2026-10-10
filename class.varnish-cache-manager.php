@@ -81,7 +81,7 @@ class ClpVarnishCacheManager {
 
     public function purge_entire_cache($host = null): void
     {
-        if (true === is_null($host)) {
+        if (true === empty($host)) {
             $host = wp_parse_url(home_url(), PHP_URL_HOST);
         }
         if (false === empty($host)) {

@@ -13,6 +13,7 @@ class ClpVarnishCacheAutoPurge {
         add_action('customize_save_after', array($this, 'auto_purge'), 100);
         add_action('wp_update_nav_menu', array($this, 'auto_purge'), 100);
         add_action('wp_update_nav_menu_item', array($this, 'auto_purge'), 100);
+        add_action('updated_option', array($this, 'option_updated'), 100);
         add_action('transition_post_status', array($this, 'post_status_changed'), 100, 3);
         add_action('wp_insert_comment', array($this, 'comment_saved'), 100);
         add_action('edit_comment', array($this, 'comment_saved'), 100);
@@ -29,6 +30,13 @@ class ClpVarnishCacheAutoPurge {
         }
 
         $this->purge_entire_cache = true;
+    }
+
+    // Widgets and the site title/tagline render on every page.
+    public function option_updated($option) {
+        if ($option === 'sidebars_widgets' || $option === 'blogname' || $option === 'blogdescription' || strpos($option, 'widget_') === 0) {
+            $this->purge_entire_cache = true;
+        }
     }
 
     // Publishing or unpublishing changes listings (home, archives, feeds) that
