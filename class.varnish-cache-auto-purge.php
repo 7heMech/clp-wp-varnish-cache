@@ -17,6 +17,7 @@ class ClpVarnishCacheAutoPurge {
 
         if (!class_exists( 'ClpVarnishCacheManager')) return;
         $manager = new ClpVarnishCacheManager();
+        $manager->set_exit_on_error(false);
 
         if (!$manager->is_enabled()) return;
 
