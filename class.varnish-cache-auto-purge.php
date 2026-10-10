@@ -14,6 +14,9 @@ class ClpVarnishCacheAutoPurge {
         add_action('wp_update_nav_menu', array($this, 'auto_purge'), 100);
         add_action('wp_update_nav_menu_item', array($this, 'auto_purge'), 100);
         add_action('transition_post_status', array($this, 'post_status_changed'), 100, 3);
+        add_action('wp_insert_comment', array($this, 'comment_saved'), 100);
+        add_action('edit_comment', array($this, 'comment_saved'), 100);
+        add_action('transition_comment_status', array($this, 'comment_status_changed'), 100, 3);
         add_action('elementor/document/after_save', array($this, 'elementor_document_saved'), 100);
         add_action('elementor/core/files/clear_cache', array($this, 'auto_purge'), 100);
         add_action('shutdown', array($this, 'purge_queued'));
@@ -41,6 +44,19 @@ class ClpVarnishCacheAutoPurge {
         }
     }
 
+    public function comment_saved($comment_id) {
+        $comment = get_comment($comment_id);
+        if (!$comment || $comment->comment_approved !== '1') return;
+
+        $this->purge_post_ids[] = (int)$comment->comment_post_ID;
+    }
+
+    public function comment_status_changed($new_status, $old_status, $comment) {
+        if ($new_status !== 'approved' && $old_status !== 'approved') return;
+
+        $this->purge_post_ids[] = (int)$comment->comment_post_ID;
+    }
+
     public function elementor_document_saved($document) {
         if (method_exists($document, 'is_autosave') && $document->is_autosave()) return;
 
@@ -48,7 +64,7 @@ class ClpVarnishCacheAutoPurge {
         // Templates and the site kit (headers, footers, global styles) render on other pages.
         if (get_post_type($post_id) === 'elementor_library') {
             $this->purge_entire_cache = true;
-        } else {
+        } elseif (get_post_status($post_id) === 'publish') {
             $this->purge_post_ids[] = $post_id;
         }
     }
@@ -60,19 +76,11 @@ class ClpVarnishCacheAutoPurge {
         $manager = new ClpVarnishCacheManager();
         $manager->set_exit_on_error(false);
 
-        if (!$manager->is_enabled()) return;
-
-        $prefix = $manager->get_cache_tag_prefix();
-
-        if ($this->purge_entire_cache) {
-            $host = wp_parse_url(home_url(), PHP_URL_HOST);
-            if (!empty($host)) $manager->purge_host($host);
-            if (!empty($prefix)) $manager->purge_tag($prefix);
-        } elseif (!empty($prefix)) {
-            // The VCL bans X-Cache-Tags by regex: purge one tag per request, and anchor
-            // the end so "post-2" doesn't also purge "post-23".
-            foreach (array_unique($this->purge_post_ids) as $post_id) {
-                $manager->purge_tag(sprintf('%s-post-%s(,|$)', $prefix, $post_id));
+        if ($manager->is_enabled()) {
+            if ($this->purge_entire_cache) {
+                $manager->purge_entire_cache();
+            } else {
+                foreach (array_unique($this->purge_post_ids) as $post_id) $manager->purge_post($post_id);
             }
         }
 

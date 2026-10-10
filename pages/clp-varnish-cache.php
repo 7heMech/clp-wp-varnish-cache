@@ -63,13 +63,7 @@ if (true === isset($_POST['action']) && 'purge-cache' == sanitize_text_field($_P
 }
 
 if (true === isset($_GET['action']) && 'purge-entire-cache' == sanitize_text_field($_GET['action'])) {
-    if (false === empty($host)) {
-        $clp_cache_manager->purge_host($host);
-    }
-    $cache_tag_prefix = $clp_cache_manager->get_cache_tag_prefix();
-    if (false === empty($cache_tag_prefix)) {
-        $clp_cache_manager->purge_tag($cache_tag_prefix);
-    }
+    $clp_cache_manager->purge_entire_cache($host);
     $successNotice = 'Varnish Cache has been purged.';
 }
 

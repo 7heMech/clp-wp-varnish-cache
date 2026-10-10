@@ -79,6 +79,29 @@ class ClpVarnishCacheManager {
         $this->purge($headers);
     }
 
+    public function purge_entire_cache($host = null): void
+    {
+        if (true === is_null($host)) {
+            $host = wp_parse_url(home_url(), PHP_URL_HOST);
+        }
+        if (false === empty($host)) {
+            $this->purge_host($host);
+        }
+        $cache_tag_prefix = $this->get_cache_tag_prefix();
+        if (false === empty($cache_tag_prefix)) {
+            $this->purge_tag($cache_tag_prefix);
+        }
+    }
+
+    public function purge_post($post_id): void
+    {
+        $cache_tag_prefix = $this->get_cache_tag_prefix();
+        if (false === empty($cache_tag_prefix)) {
+            // The VCL bans X-Cache-Tags by regex; anchor it so post 2 doesn't also purge post 23.
+            $this->purge_tag(sprintf('(^|,)%s-post-%d(,|$)', $cache_tag_prefix, $post_id));
+        }
+    }
+
     public function purge_tag($tag): void
     {
         $this->purge_tags([$tag]);

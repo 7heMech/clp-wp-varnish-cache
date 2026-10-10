@@ -28,14 +28,7 @@ class ClpVarnishCacheAdmin {
             if (false === isset($_GET['_wpnonce']) || false === wp_verify_nonce(sanitize_text_field($_GET['_wpnonce']), 'purge-entire-cache')) {
                 return;                                                                           
             }   
-            $host = $this->get_request_host();
-            if (false === empty($host)) {
-                $this->clp_varnish_cache_manager->purge_host($host);
-            }
-            $cache_tag_prefix = $this->clp_varnish_cache_manager->get_cache_tag_prefix();
-            if (false === empty($cache_tag_prefix)) {
-                $this->clp_varnish_cache_manager->purge_tag($cache_tag_prefix);
-            }
+            $this->clp_varnish_cache_manager->purge_entire_cache($this->get_request_host());
             if (true === is_admin()) {
                 add_action('admin_notices', array( $this, 'admin_entire_cache_purge'));
             } else {
