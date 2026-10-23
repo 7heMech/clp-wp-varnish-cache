@@ -54,7 +54,7 @@ class ClpVarnishCacheAdmin {
                 return;
             }
             $current_url = $this->get_current_url();
-            $this->clp_varnish_cache_manager->purge_url($current_url);
+            $this->clp_varnish_cache_manager->purge_exact_url($current_url);
             wp_safe_redirect($current_url);
             exit;
         }
@@ -67,8 +67,23 @@ class ClpVarnishCacheAdmin {
 
     private function get_current_url() {
         $request_uri = (true === isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : '/');
-        $current_url = sprintf('%s://%s%s', (true === is_ssl() ? 'https' : 'http'), $this->get_request_host(), $request_uri);
-        return remove_query_arg(['clp-varnish-cache', '_wpnonce'], $current_url);
+        $parts = explode('?', $request_uri, 2);
+        if (isset($parts[1])) {
+            // Preserve the query's encoding and repeated keys: they are part of
+            // Varnish's cache key, even when PHP parses them to the same value.
+            $query = array_filter(explode('&', $parts[1]), function($parameter) {
+                $key = urldecode(explode('=', $parameter, 2)[0]);
+                return !in_array($key, ['clp-varnish-cache', '_wpnonce'], true);
+            });
+            $request_uri = $parts[0] . (empty($query) ? '' : '?' . implode('&', $query));
+        }
+        return sprintf('%s://%s%s', (true === is_ssl() ? 'https' : 'http'), $this->get_request_host(), $request_uri);
+    }
+
+    private function get_frontend_purge_url($action) {
+        $url = $this->get_current_url();
+        $separator = strpos($url, '?') === false ? '?' : '&';
+        return esc_url($url . $separator . 'clp-varnish-cache=' . $action . '&_wpnonce=' . wp_create_nonce($action));
     }
 
     public function admin_entire_cache_purge() {
@@ -104,7 +119,7 @@ class ClpVarnishCacheAdmin {
                         'parent' => 'clp-varnish-cache-purge',
                         'id'     => 'clp-varnish-cache-purge-entire-cache',
                         'title'  => __( 'Entire Cache', 'clp-varnish-cache' ),
-                        'href'   => wp_nonce_url(add_query_arg('clp-varnish-cache', 'purge-entire-cache'), 'purge-entire-cache'),
+                        'href'   => $is_admin ? wp_nonce_url(add_query_arg('clp-varnish-cache', 'purge-entire-cache'), 'purge-entire-cache') : $this->get_frontend_purge_url('purge-entire-cache'),
                         'meta'   => [
                             'title' => __( 'Entire Cache', 'clp-varnish-cache' ),
                         ],
@@ -131,7 +146,7 @@ class ClpVarnishCacheAdmin {
                         'parent' => 'clp-varnish-cache-purge',
                         'id'     => 'clp-varnish-cache-purge-current-url',
                         'title'  => __( 'This Page', 'clp-varnish-cache' ),
-                        'href'   => wp_nonce_url(add_query_arg('clp-varnish-cache', 'purge-current-url'), 'purge-current-url'),
+                        'href'   => $this->get_frontend_purge_url('purge-current-url'),
                         'meta'   => [
                             'title' => __( 'This Page', 'clp-varnish-cache' ),
                         ],
