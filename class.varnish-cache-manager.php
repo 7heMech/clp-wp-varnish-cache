@@ -98,7 +98,7 @@ class ClpVarnishCacheManager {
         $cache_tag_prefix = $this->get_cache_tag_prefix();
         if (false === empty($cache_tag_prefix)) {
             // The VCL bans X-Cache-Tags by regex; anchor it so post 2 doesn't also purge post 23.
-            $this->purge_tag(sprintf('(^|,)%s-post-%d(,|$)', $cache_tag_prefix, $post_id));
+            $this->purge_tag(sprintf('(^|,)%s-post-%d(,|$)', preg_quote($cache_tag_prefix), $post_id));
         }
     }
 

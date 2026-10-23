@@ -13,8 +13,12 @@ class ClpVarnishCacheAutoPurge {
         add_action('customize_save_after', array($this, 'auto_purge'), 100);
         add_action('wp_update_nav_menu', array($this, 'auto_purge'), 100);
         add_action('wp_update_nav_menu_item', array($this, 'auto_purge'), 100);
-        add_action('updated_option', array($this, 'option_updated'), 100);
+        add_action('wp_delete_nav_menu', array($this, 'auto_purge'), 100);
+        add_action('updated_option', array($this, 'option_updated'), 100, 3);
+        add_action('added_option', array($this, 'option_added'), 100, 2);
+        add_action('delete_option', array($this, 'option_deleted'), 100);
         add_action('transition_post_status', array($this, 'post_status_changed'), 100, 3);
+        add_action('before_delete_post', array($this, 'before_post_deleted'), 100);
         add_action('wp_insert_comment', array($this, 'comment_saved'), 100);
         add_action('edit_comment', array($this, 'comment_saved'), 100);
         add_action('transition_comment_status', array($this, 'comment_status_changed'), 100, 3);
@@ -33,9 +37,25 @@ class ClpVarnishCacheAutoPurge {
     }
 
     // Widgets and the site title/tagline render on every page.
-    public function option_updated($option) {
+    public function option_updated($option, $old_value = null, $value = null) {
         if ($option === 'sidebars_widgets' || $option === 'blogname' || $option === 'blogdescription' || strpos($option, 'widget_') === 0) {
             $this->purge_entire_cache = true;
+        }
+        if (strpos($option, 'theme_mods_') === 0) {
+            $old_locations = is_array($old_value) && isset($old_value['nav_menu_locations']) ? $old_value['nav_menu_locations'] : [];
+            $locations = is_array($value) && isset($value['nav_menu_locations']) ? $value['nav_menu_locations'] : [];
+            if ($old_locations !== $locations) $this->purge_entire_cache = true;
+        }
+    }
+
+    public function option_added($option, $value) {
+        $this->option_updated($option, null, $value);
+    }
+
+    public function option_deleted($option) {
+        // delete_option runs before removal, while the old menu locations exist.
+        if (strpos($option, 'theme_mods_') === 0) {
+            $this->option_updated($option, get_option($option), null);
         }
     }
 
@@ -43,6 +63,11 @@ class ClpVarnishCacheAutoPurge {
     // don't carry the post's cache tag yet, so only in-place updates purge by tag.
     public function post_status_changed($new_status, $old_status, $post) {
         if ($new_status !== 'publish' && $old_status !== 'publish') return;
+        // Navigation records are not viewable posts, but render across the site.
+        if (in_array($post->post_type, ['wp_navigation', 'nav_menu_item'], true)) {
+            $this->purge_entire_cache = true;
+            return;
+        }
         if (!is_post_type_viewable($post->post_type)) return;
 
         if ($new_status !== $old_status) {
@@ -50,6 +75,13 @@ class ClpVarnishCacheAutoPurge {
         } else {
             $this->purge_post_ids[] = $post->ID;
         }
+    }
+
+    public function before_post_deleted($post_id) {
+        // Permanent deletion bypasses transition_post_status. Capture the old
+        // status before removal and invalidate listings as for unpublishing.
+        $post = get_post($post_id);
+        if ($post) $this->post_status_changed('delete', $post->post_status, $post);
     }
 
     public function comment_saved($comment_id) {
